@@ -35,7 +35,9 @@ def _get_client():
             aws_secret_access_key=os.getenv("S3_SECRET_ACCESS_KEY"),
             region_name=os.getenv("S3_REGION") or "us-east-1",
             endpoint_url=os.getenv("S3_ENDPOINT_URL"),
-            config=Config(signature_version="s3v4"),
+            # 腾讯云 COS / 阿里云 OSS 均要求 virtual-hosted 风格
+            # （bucket.endpoint/key），path-style 会被拒绝（PathStyleDomainForbidden）
+            config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"}),
         )
     return _s3
 
