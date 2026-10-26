@@ -1,11 +1,16 @@
-"""Cloudflare R2（S3 兼容）客户端封装 —— 浏览器直传方案。
+"""通用 S3 兼容对象存储客户端 —— 腾讯云 COS / 阿里云 OSS / Cloudflare R2 均适用。
 
-后端只负责三件事：
-1. 签发短期预签名 PUT 地址，浏览器把文件直传 R2，不占用 Render 内存/带宽
-2. 访问时动态签发预签名 GET 地址（分享页每次打开都现签，永不失效）
-3. head_object 核实文件确实上传成功后才入库
+环境变量：
+- S3_ENDPOINT_URL      服务端点，如 https://cos.ap-guangzhou.myqcloud.com
+- S3_REGION            地域，如 ap-guangzhou
+- S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY / S3_BUCKET_NAME
+- S3_PUBLIC_BASE_URL   可选。公有读桶的固定访问域名
+                       （如 https://bucket.cos.ap-guangzhou.myqcloud.com），
+                       配置后视频/文件走固定公开地址，可被浏览器缓存；
+                       不配置则动态签发预签名地址。
 
-数据库只保存 Object Key；绑定了 R2 自定义域时可改用公开固定地址（可缓存）。
+后端只负责：签发预签名 PUT（浏览器直传）、按需签发读取地址、head_object 核实。
+数据库只保存 Object Key，不保存任何带签名参数的临时 URL。
 """
 import os
 from typing import Optional
@@ -24,31 +29,31 @@ _s3 = None
 def _get_client():
     global _s3
     if _s3 is None:
-        account_id = os.getenv("R2_ACCOUNT_ID")
         _s3 = boto3.client(
             "s3",
-            aws_access_key_id=os.getenv("R2_ACCESS_KEY_ID"),
-            aws_secret_access_key=os.getenv("R2_SECRET_ACCESS_KEY"),
-            endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+            aws_access_key_id=os.getenv("S3_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.getenv("S3_SECRET_ACCESS_KEY"),
+            region_name=os.getenv("S3_REGION") or "us-east-1",
+            endpoint_url=os.getenv("S3_ENDPOINT_URL"),
             config=Config(signature_version="s3v4"),
         )
     return _s3
 
 
 def _bucket() -> str:
-    return os.getenv("R2_BUCKET_NAME", "")
+    return os.getenv("S3_BUCKET_NAME", "")
 
 
-def r2_configured() -> bool:
+def s3_configured() -> bool:
     return all(
         os.getenv(k)
-        for k in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME")
+        for k in ("S3_ENDPOINT_URL", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_BUCKET_NAME")
     )
 
 
 def public_url(key: str) -> Optional[str]:
-    """绑定了 R2 自定义域时返回公开固定地址，否则 None（走预签名）。"""
-    base = os.getenv("R2_PUBLIC_BASE_URL", "").rstrip("/")
+    """配置了公有读域名时返回固定公开地址，否则 None（走预签名）。"""
+    base = os.getenv("S3_PUBLIC_BASE_URL", "").rstrip("/")
     return f"{base}/{key}" if base else None
 
 
@@ -88,4 +93,4 @@ def delete_object(key: str) -> None:
     try:
         _get_client().delete_object(Bucket=_bucket(), Key=key)
     except ClientError:
-        pass  # 删除失败不阻塞流程，孤儿文件可后续在 R2 控制台清理
+        pass  # 删除失败不阻塞流程，孤儿文件可后续在控制台清理

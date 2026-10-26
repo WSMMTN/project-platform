@@ -27,13 +27,13 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from database import Project, ProjectFile, User, create_db, get_db
-from r2_client import (
+from s3_client import (
     PRESIGN_PUT_EXPIRES,
     delete_object,
     head_object,
     presign_get_url,
     presign_put_url,
-    r2_configured,
+    s3_configured,
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -286,7 +286,7 @@ def project_page(
     return templates.TemplateResponse(
         request,
         "project_edit.html",
-        {"user": user, "p": p, "share_url": share_url, "r2_ready": r2_configured()},
+        {"user": user, "p": p, "share_url": share_url, "r2_ready": s3_configured()},
     )
 
 
@@ -358,8 +358,8 @@ def api_upload_url(
     db: Session = Depends(get_db),
 ):
     p = own_project(db, user, pid)
-    if not r2_configured():
-        raise HTTPException(status_code=500, detail="对象存储未配置，请检查 R2 环境变量")
+    if not s3_configured():
+        raise HTTPException(status_code=500, detail="对象存储未配置，请检查 S3 环境变量")
     ext = _ext_of(body.filename)
     if ext not in ALLOWED_EXT:
         raise HTTPException(status_code=400, detail="仅支持 mp4 / ppt / pptx / pdf")
@@ -426,7 +426,7 @@ def shared_view(share_uuid: str, request: Request, db: Session = Depends(get_db)
     )
     if p is None:
         raise HTTPException(status_code=404, detail="链接不存在或分享已关闭")
-    if p.files and not r2_configured():
+    if p.files and not s3_configured():
         raise HTTPException(status_code=500, detail="对象存储未配置")
     files = [
         {

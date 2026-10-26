@@ -17,13 +17,15 @@ services:
           property: connectionString
       - key: SECRET_KEY
         generateValue: true
-      - key: R2_ACCOUNT_ID
+      - key: S3_ENDPOINT_URL
         sync: false
-      - key: R2_ACCESS_KEY_ID
+      - key: S3_REGION
         sync: false
-      - key: R2_SECRET_ACCESS_KEY
+      - key: S3_ACCESS_KEY_ID
         sync: false
-      - key: R2_BUCKET_NAME
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET_NAME
         sync: false
 
 databases:
