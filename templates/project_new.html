@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}新建项目 - 项目展示平台{% endblock %}
+{% block content %}
+<div class="auth-card wide">
+  <h1>新建项目</h1>
+  <form method="post" action="/projects/new" class="stack">
+    <label>标题<input name="title" required maxlength="200" placeholder="例如：智慧校园管理系统"></label>
+    <label>描述<textarea name="description" rows="5" placeholder="项目简介、亮点、成果……"></textarea></label>
+    <label>技术栈<textarea name="tech_stack" rows="2" placeholder="例如：FastAPI / Vue / MySQL"></textarea></label>
+    <button type="submit">创建</button>
+  </form>
+</div>
+{% endblock %}

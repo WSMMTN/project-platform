@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}登录 - 项目展示平台{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <h1>登录</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form method="post" action="/login" class="stack">
+    <label>用户名<input name="username" value="{{ username or '' }}" required autofocus></label>
+    <label>密码<input type="password" name="password" required></label>
+    <button type="submit">登录</button>
+  </form>
+  <p class="muted">还没有账号？<a href="/register">注册</a></p>
+</div>
+{% endblock %}

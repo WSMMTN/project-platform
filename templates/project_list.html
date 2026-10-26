@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}我的项目 - 项目展示平台{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>我的项目</h1>
+  <a class="btn" href="/projects/new">+ 新建项目</a>
+</div>
+{% if not projects %}
+<p class="muted">还没有项目，点击右上角创建第一个。</p>
+{% endif %}
+<div class="cards">
+  {% for p in projects %}
+  <div class="card">
+    <h2><a href="/projects/{{ p.id }}">{{ p.title }}</a></h2>
+    <p class="muted clamp">{{ p.description or "暂无描述" }}</p>
+    <div class="card-meta">
+      <span class="muted">{{ p.files|length }} 个文件</span>
+      <span class="tag {{ 'tag-on' if p.share_enabled else 'tag-off' }}">{{ "分享中" if p.share_enabled else "未分享" }}</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ project.title }}{% endblock %}
+{% block nav %}{% endblock %}
+{% block content %}
+<article class="share-page">
+  <p class="muted share-badge">项目分享</p>
+  <h1>{{ project.title }}</h1>
+  {% if project.tech_stack %}
+  <p class="tech">{{ project.tech_stack }}</p>
+  {% endif %}
+  {% if project.description %}
+  <p class="desc">{{ project.description }}</p>
+  {% endif %}
+
+  {% for f in files %}
+    {% if f.obj.file_type == "video" %}
+    <section class="file-block">
+      <video controls preload="metadata" src="{{ f.view_url }}"></video>
+      <div class="btn-row">
+        <a class="btn" href="{{ f.download_url }}">下载视频</a>
+      </div>
+    </section>
+    {% elif f.obj.file_type == "pdf" %}
+    <section class="file-block file-card">
+      <span class="file-name">PDF · {{ f.obj.file_name }}</span>
+      <span class="muted">{{ "%.1f MB"|format(f.obj.size / 1048576) if f.obj.size else "" }}</span>
+      <div class="btn-row">
+        <a class="btn" href="{{ f.view_url }}" target="_blank">在线查看</a>
+        <a class="btn" href="{{ f.download_url }}">下载</a>
+      </div>
+    </section>
+    {% else %}
+    <section class="file-block file-card">
+      <span class="file-name">演示文稿 · {{ f.obj.file_name }}</span>
+      <span class="muted">{{ "%.1f MB"|format(f.obj.size / 1048576) if f.obj.size else "" }}</span>
+      <div class="btn-row">
+        <a class="btn" href="{{ f.download_url }}">下载 PPT</a>
+      </div>
+    </section>
+    {% endif %}
+  {% endfor %}
+
+  {% if not files %}
+  <p class="muted">该项目暂无文件。</p>
+  {% endif %}
+</article>
+{% endblock %}

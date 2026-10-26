@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}{{ p.title }} - 项目展示平台{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ p.title }}</h1>
+  <a class="btn" href="/projects">返回列表</a>
+</div>
+
+{% if not r2_ready %}
+<p class="error">R2 未配置：请填写 R2_ACCOUNT_ID、R2_ACCESS_KEY_ID、R2_SECRET_ACCESS_KEY、R2_BUCKET_NAME 环境变量后再上传。</p>
+{% endif %}
+
+<section class="panel">
+  <h2>基本信息</h2>
+  <form method="post" action="/projects/{{ p.id }}/edit" class="stack">
+    <label>标题<input name="title" value="{{ p.title }}" required maxlength="200"></label>
+    <label>描述<textarea name="description" rows="4">{{ p.description }}</textarea></label>
+    <label>技术栈<textarea name="tech_stack" rows="2">{{ p.tech_stack }}</textarea></label>
+    <button type="submit">保存修改</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>分享链接</h2>
+  <p>状态：<span class="tag {{ 'tag-on' if p.share_enabled else 'tag-off' }}">{{ "已开启" if p.share_enabled else "已关闭" }}</span></p>
+  <div class="share-row">
+    <input id="share-link" readonly value="{{ share_url }}" onclick="this.select()">
+    <button type="button" onclick="copyShare()">复制</button>
+  </div>
+  <p class="muted">访客打开该链接即可在线看视频、下载文件，无需登录。</p>
+  <div class="btn-row">
+    <form method="post" action="/projects/{{ p.id }}/toggle-share">
+      <button type="submit">{{ "关闭分享" if p.share_enabled else "开启分享" }}</button>
+    </form>
+    <form method="post" action="/projects/{{ p.id }}/regen-share" onsubmit="return confirm('重新生成后旧链接立即失效，确定？')">
+      <button type="submit">重置链接</button>
+    </form>
+    <form method="post" action="/projects/{{ p.id }}/delete" onsubmit="return confirm('删除项目会同时删除所有已上传文件，确定？')">
+      <button type="submit" class="danger">删除项目</button>
+    </form>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>上传文件</h2>
+  <p class="muted">支持 mp4 / ppt / pptx / pdf，单个不超过 2GB，浏览器直传 Cloudflare R2，不经过服务器。</p>
+  <div class="upload-row">
+    <input type="file" id="file-input" accept=".mp4,.ppt,.pptx,.pdf">
+    <button type="button" id="upload-btn" onclick="handleUpload()">上传</button>
+  </div>
+  <div class="progress"><div id="progress-bar"></div></div>
+  <p id="upload-status" class="muted"></p>
+</section>
+
+<section class="panel">
+  <h2>文件列表</h2>
+  {% if p.files %}
+  <table>
+    <thead><tr><th>文件名</th><th>类型</th><th>大小</th><th></th></tr></thead>
+    <tbody>
+    {% for f in p.files %}
+      <tr>
+        <td>{{ f.file_name }}</td>
+        <td>{{ {"video": "视频", "ppt": "演示文稿", "pdf": "PDF"}[f.file_type] }}</td>
+        <td>{{ "%.1f MB"|format(f.size / 1048576) if f.size else "-" }}</td>
+        <td><button type="button" class="danger" onclick="deleteFile({{ f.id }})">删除</button></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">还没有文件，先上传一个视频或 PPT 吧。</p>
+  {% endif %}
+</section>
+
+<script>
+const PID = {{ p.id }};
+const MAX_SIZE = 2 * 1024 * 1024 * 1024;
+
+function $(id) { return document.getElementById(id); }
+
+function setProgress(pct, text, isError) {
+  $("progress-bar").style.width = pct + "%";
+  $("upload-status").textContent = text;
+  $("upload-status").classList.toggle("error", !!isError);
+}
+
+async function getUploadUrl(filename, size, contentType) {
+  const resp = await fetch(`/api/projects/${PID}/upload-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename, size, content_type: contentType }),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.detail || "获取上传地址失败");
+  }
+  return resp.json();
+}
+
+function putToR2(url, file) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        setProgress(Math.round((e.loaded / e.total) * 100), `上传中 ${Math.round((e.loaded / e.total) * 100)}%`);
+      }
+    };
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error("R2 返回状态码 " + xhr.status));
+    xhr.onerror = () => reject(new Error("网络错误，请检查 R2 桶的 CORS 配置"));
+    xhr.send(file);
+  });
+}
+
+async function handleUpload() {
+  const file = $("file-input").files[0];
+  if (!file) return alert("请先选择文件");
+  if (file.size > MAX_SIZE) return alert("文件超过 2GB 限制");
+  $("upload-btn").disabled = true;
+  try {
+    setProgress(0, "正在获取上传地址…");
+    const data = await getUploadUrl(file.name, file.size, file.type || "application/octet-stream");
+    await putToR2(data.upload_url, file);
+    setProgress(100, "上传完成，正在保存记录…");
+    const resp = await fetch(`/api/projects/${PID}/files`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: data.key, filename: file.name }),
+    });
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(e.detail || "保存失败");
+    }
+    location.reload();
+  } catch (err) {
+    setProgress(0, "上传失败：" + err.message, true);
+  } finally {
+    $("upload-btn").disabled = false;
+  }
+}
+
+async function deleteFile(fid) {
+  if (!confirm("确定删除该文件？")) return;
+  const resp = await fetch(`/api/files/${fid}`, { method: "DELETE" });
+  if (resp.ok) location.reload();
+  else alert("删除失败");
+}
+
+function copyShare() {
+  const input = $("share-link");
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    $("upload-status").textContent = "分享链接已复制";
+  });
+}
+</script>
+{% endblock %}
