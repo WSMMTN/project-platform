@@ -1,0 +1,3 @@
+#!/bin/bash
+# 腾讯云 SCF Web函数启动脚本：Web函数要求监听 0.0.0.0:${SCF_WEB_PORT}（默认 9000）
+exec python3 -m uvicorn main:app --host 0.0.0.0 --port ${SCF_WEB_PORT:-9000}

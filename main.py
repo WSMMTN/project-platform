@@ -1,8 +1,11 @@
-"""项目展示平台 —— FastAPI + Session 登录 + Cloudflare R2 浏览器直传。
+"""项目展示平台 —— FastAPI + Session 登录 + 对象存储浏览器直传。
+
+- 存储：腾讯云 COS / 阿里云 OSS / Cloudflare R2 等 S3 兼容服务均可（见 s3_client.py）
+- 部署：腾讯云 SCF Web函数（SQLite + COS 快照）或 Render + PostgreSQL（render.yaml）
 
 路由一览：
 - 页面：/register /login /logout /projects /projects/new /projects/{pid}
-- 直传 API：POST /api/projects/{pid}/upload-url -> 浏览器 PUT R2 -> POST .../files
+- 直传 API：POST /api/projects/{pid}/upload-url -> 浏览器直传对象存储 -> POST .../files
 - 文件删除：DELETE /api/files/{fid}
 - 分享：POST /projects/{pid}/toggle-share /regen-share /delete；GET /shared/{share_uuid}
 - 健康检查：GET /healthz
@@ -385,9 +388,9 @@ def api_confirm_file(
     ext = _ext_of(body.key)
     if not body.key.startswith(prefix) or ext not in ALLOWED_EXT:
         raise HTTPException(status_code=400, detail="非法的文件路径")
-    info = head_object(body.key)  # 到 R2 核实文件确实上传成功
+    info = head_object(body.key)  # 到对象存储核实文件确实上传成功
     if info is None:
-        raise HTTPException(status_code=400, detail="R2 中未找到该文件，请重新上传")
+        raise HTTPException(status_code=400, detail="对象存储中未找到该文件，请重新上传")
     f = ProjectFile(
         file_name=body.filename.strip()[:255] or body.key.rsplit("/", 1)[-1],
         file_type=ALLOWED_EXT[ext],

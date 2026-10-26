@@ -96,3 +96,21 @@ def delete_object(key: str) -> None:
         _get_client().delete_object(Bucket=_bucket(), Key=key)
     except ClientError:
         pass  # 删除失败不阻塞流程，孤儿文件可后续在控制台清理
+
+
+def upload_bytes(key: str, data: bytes, content_type: str = "application/octet-stream") -> bool:
+    """上传内存中的字节（如数据库快照）。"""
+    try:
+        _get_client().put_object(Bucket=_bucket(), Key=key, Body=data, ContentType=content_type)
+        return True
+    except ClientError:
+        return False
+
+
+def download_object(key: str) -> Optional[bytes]:
+    """读取对象字节，不存在或失败返回 None。"""
+    try:
+        resp = _get_client().get_object(Bucket=_bucket(), Key=key)
+        return resp["Body"].read()
+    except ClientError:
+        return None
