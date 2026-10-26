@@ -27,6 +27,8 @@ services:
         sync: false
       - key: S3_BUCKET_NAME
         sync: false
+      - key: S3_PUBLIC_BASE_URL
+        sync: false
 
 databases:
   - name: project-platform-db
